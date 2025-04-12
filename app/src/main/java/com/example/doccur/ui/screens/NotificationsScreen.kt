@@ -1,22 +1,44 @@
 package com.example.doccur.ui.screens
 
-
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.CalendarToday
+import androidx.compose.material.icons.filled.Cancel
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Description
+import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
+
+import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.doccur.entities.Notification
 import com.example.doccur.viewmodels.NotificationViewModel
+import androidx.compose.ui.text.TextStyle
+import com.example.doccur.ui.theme.AppColors
+import com.example.doccur.ui.theme.Inter
 
+val customTextStyle = TextStyle(
+    fontFamily = Inter,
+)
 @Composable
 fun NotificationsScreen(
     viewModel: NotificationViewModel,
@@ -28,50 +50,143 @@ fun NotificationsScreen(
     val isLoading by viewModel.loading.collectAsState()
     val error by viewModel.error.collectAsState()
 
+
+
     // Effect to fetch notifications when the screen is displayed
     LaunchedEffect(key1 = userId, key2 = userType) {
         viewModel.fetchNotifications(userId, userType)
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        // Show loading spinner if loading
-        if (isLoading) {
-            CircularProgressIndicator(
-                modifier = Modifier.align(Alignment.Center)
-            )
-        }
-
-        // Show error if there's an error
-        error?.let { errorMsg ->
-            Text(
-                text = errorMsg,
-                color = Color.Red,
+    CompositionLocalProvider(
+        LocalTextStyle provides customTextStyle
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            // Header with title and "Mark all as read" button
+            Card(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(16.dp)
-            )
-        }
-
-        // Show notifications list
-        if (!isLoading && error == null) {
-            if (notifications.isEmpty()) {
-                // Show empty state
-                Text(
-                    text = "No notifications",
-                    modifier = Modifier.align(Alignment.Center)
-                )
-            } else {
-                // Show notifications list
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(16.dp)
+                    .fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp),
+                elevation = 4.dp,
+                backgroundColor = Color.White,
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal=24.dp, vertical = 20.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    items(notifications) { notification ->
-                        NotificationItem(
-                            notification = notification,
-                            onMarkAsRead = { viewModel.markAsRead(notification.id) }
+                    Text(
+                        text = "Notifications",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.Black
+                    )
+
+                    TextButton(onClick = {
+                        // Mark all notifications as read
+                        notifications.forEach { notification ->
+                            if (!notification.isRead) {
+                                viewModel.markAsRead(notification.id)
+                            }
+                        }
+                    }) {
+                        Text(
+                            text = "Mark all as read",
+                            color = AppColors.Blue,
+                            fontWeight = FontWeight.Medium
                         )
-                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                }
+            }
+
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+
+            Box(modifier = Modifier.fillMaxSize()) {
+                // Show loading spinner if loading
+                if (isLoading) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.align(Alignment.Center)
+                    )
+                }
+
+                // Show error if there's an error
+                error?.let { errorMsg ->
+                    Text(
+                        text = errorMsg,
+                        color = Color.Red,
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .padding(16.dp)
+                    )
+                }
+
+                // Show notifications list
+                if (!isLoading && error == null) {
+                    if (notifications.isEmpty()) {
+                        // Show empty state
+                        Text(
+                            text = "No notifications",
+                            modifier = Modifier.align(Alignment.Center)
+                        )
+                    } else {
+                        // Show notifications list
+                        LazyColumn(
+                            modifier = Modifier.fillMaxSize()
+                        ) {
+                            items(notifications) { notification ->
+                                // Determine icon based on content (in a real app, this would be determined by notification type)
+                                val message = notification.message.orEmpty()
+
+                                val (icon, iconBackgroundColor) = when {
+                                    // Doctor confirmed appointment
+                                    message.contains("confirm", ignoreCase = true) ->
+                                        Pair(Icons.Default.CheckCircle, AppColors.Green) // greenish background
+
+                                    // Doctor rejected appointment
+                                    message.contains("reject", ignoreCase = true) ->
+                                        Pair(Icons.Default.Cancel, Color(0xFFB91C1C)) // light red background
+
+                                    // Patient canceled appointment
+                                    message.contains("cancel", ignoreCase = true) ->
+                                        Pair(Icons.Default.Cancel, Color(0xFFB91C1C)) // same as rejection (can customize if needed)
+
+                                    // Patient rescheduled appointment
+                                    message.contains("reschedule", ignoreCase = true) ->
+                                        Pair(Icons.Default.EventRepeat, Color(0xFFB91C1C)) // light blue background
+
+                                    // Default fallback
+                                    else ->
+                                        Pair(Icons.Default.Notifications, Color(0xFFE3E3E3))
+                                }
+
+                                // Determine timeAgo text based on createdAt (in a real app, this would be calculated)
+                                val timeAgo = when {
+                                    notification.message?.contains(
+                                        "tomorrow",
+                                        ignoreCase = true
+                                    ) == true -> "2 hours ago"
+
+                                    notification.message?.contains(
+                                        "pickup",
+                                        ignoreCase = true
+                                    ) == true -> "Yesterday"
+
+                                    else -> "2 days ago"
+                                }
+
+
+                                NotificationItem(
+                                    notification = notification,
+                                    icon = icon,
+                                    iconColor = iconBackgroundColor,
+                                    timeAgo = timeAgo,
+                                    isUnread = !notification.isRead
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -82,44 +197,70 @@ fun NotificationsScreen(
 @Composable
 fun NotificationItem(
     notification: Notification,
-    onMarkAsRead: () -> Unit
+    icon: ImageVector,
+    iconColor: Color,
+    timeAgo: String,
+    isUnread: Boolean
 ) {
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
-        elevation = 4.dp,
-        shape = RoundedCornerShape(8.dp)
+
+    CompositionLocalProvider(
+        LocalTextStyle provides customTextStyle
     ) {
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp)
         ) {
-            Text(
-                text = notification.message?: "No message available",
-                fontSize = 16.sp,
-                color = Color.Black
-            )
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(8.dp),
+                backgroundColor = Color.White,
+                border = BorderStroke(0.2.dp, AppColors.LightGray),
 
-            Spacer(modifier = Modifier.height(8.dp))
-
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            // Show Mark as Read button only if notification is not read yet
-            if (!notification.isRead) {
+            ) {
                 Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalAlignment = Alignment.Top
                 ) {
-                    Button(
-                        onClick = onMarkAsRead,
-                        colors = ButtonDefaults.buttonColors(
-                            backgroundColor = MaterialTheme.colors.primary
+                    // Notification icon with background
+
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = iconColor,
+                    )
+
+
+                    Spacer(modifier = Modifier.width(16.dp))
+
+                    // Notification content
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = notification.message ?: "No message available",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Normal,
+                            color = Color.Black
                         )
-                    ) {
-                        Text("Mark as Read")
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = timeAgo,
+                            fontSize = 14.sp,
+                            color = Color.Gray
+                        )
+                    }
+
+                    // Unread indicator
+                    if (isUnread) {
+                        Box(
+                            modifier = Modifier
+                                .size(8.dp)
+                                .clip(CircleShape)
+                                .background(AppColors.Blue)
+                        )
                     }
                 }
             }
